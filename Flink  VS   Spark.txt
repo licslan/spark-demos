@@ -1,0 +1,569 @@
+
+								----------------------------------
+								-                                -
+								-       Flink    vs   Spark      -
+								-                                -
+								----------------------------------
+
+                                                                                Author By WeiLin Huang    2018-09-28
+
+[
+这篇文章主要内容：
+----------------------------------------------------
+-  1.比较spark与flink优势与不足                    -
+-  2.选择合适大数据生态圈（根据业务需求选择）      -
+-  3.spark与flink适用场景                          -
+-  4.搭建spark/flink测试环境流程  spark 优先搭建   -
+----------------------------------------------------
+]
+
+
+
+[1].比较spark与flink优势与不足
+
+Flink 基本架构  http://flink-china.org/   https://flink.apache.org/
+
+[Apache Flink] is a framework and distributed processing engine for stateful computations over
+unbounded and bounded data streams. Flink has been designed to run in all common cluster environments, 
+perform computations at in-memory speed and at any scale.
+
+Data can be processed as [unbounded] or [bounded] streams.
+Unbounded streams have a start but no defined end. They do not terminate and provide data as it is generated. Unbounded streams must be continuously processed, i.e., events must be promptly handled after they have been ingested. It is not possible to wait for all input data to arrive because the input is unbounded and will not be complete at any point in time. Processing unbounded data often requires that events are ingested in a specific order, such as the order in which events occurred, to be able to reason about result completeness.
+
+Bounded streams have a defined start and end. Bounded streams can be processed by ingesting all data before performing any computations. Ordered ingestion is not required to process bounded streams because a bounded data set can always be sorted. Processing of bounded streams is also known as batch processing.
+
+Apache Flink excels at processing unbounded and bounded data sets. Precise control of time and state enable Flink’s runtime to run any kind of application on unbounded streams. Bounded streams are internally processed by algorithms and data structures that are specifically designed for fixed sized data sets, yielding excellent performance.
+
+Convince yourself by exploring the use cases that have been built on top of Flink
+
+
+Spark 基本架构   http://spark.apache.org/  http://flink-china.org/   https://flink.apache.org/
+
+[Apache Spark] is a fast and general-purpose cluster computing system. It provides high-level APIs in Java, Scala, Python and R, and an optimized engine that supports general execution graphs. It also supports a rich set of higher-level tools including Spark SQL for SQL and structured data processing, MLlib for machine learning, GraphX for graph processing, and Spark Streaming.
+
+
+Spark powers a stack of libraries including SQL and DataFrames, MLlib for machine learning, GraphX, and Spark Streaming. You can combine these libraries seamlessly in the same application.
+--------------------------------------------------------------
+-   Spark-SQL  Spark-Streaming  MLib-macineLearning  GraphX  -
+-                                                            -
+-                     Apach Spark                            -
+--------------------------------------------------------------
+
+
+Runs Everywhere
+Spark runs on Hadoop, Apache Mesos, Kubernetes, standalone, or in the cloud. It can access diverse data sources.
+You can run Spark using its standalone cluster mode, on EC2, on Hadoop YARN, on Mesos, or on Kubernetes. Access data in HDFS, Alluxio, Apache Cassandra, Apache HBase, Apache Hive, and hundreds of other data sources.
+
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------
+1、Spark在SQL上的优化，尤其是DataFrame到DataSet其实是借鉴的Flink的。Flink最初一开始对SQL支持得就更好。
+2、Spark的cache in memory在Flink中是由框架自己判断的，而不是用户来指定的，因为Flink对数据的处理不像Spark以RDD为单位，就是一种细粒度的处理，对内存的规划更好。
+3、Flink原来用Java写确实很难看，现在也在向Spark靠拢，Scala的支持也越来越好。不管怎么说，二者目前都是在相互吸收。
+=============================
+1、抽象 Abstraction　　
+Spark中，对于批处理我们有RDD,对于流式，我们有DStream，不过内部实际还是RDD.所以所有的数据表示本质上还是RDD抽象。
+后面我会重点从不同的角度对比这两者。在Flink中，对于批处理有DataSet，对于流式我们有DataStreams。看起来和Spark类似，他们的不同点在于：　　
+（一）DataSet在运行时是表现为运行计划(runtime plans)的　　
+在Spark中，RDD在运行时是表现为java objects的。通过引入Tungsten，这块有了些许的改变。但是在Flink中是被表现为logical plan(逻辑计划)的，听起来很熟悉？没错，就是类似于Spark中的dataframes。所以在Flink中你使用的类Dataframe api是被作为第一优先级来优化的。
+但是相对来说在Spark RDD中就没有了这块的优化了。　Flink中的Dataset，对标Spark中的Dataframe，在运行前会经过优化。在Spark 1.6，　
+dataset API已经被引入Spark了，也许最终会取代RDD 抽象。　　 
+（二）Dataset和DataStream是独立的API　　
+在Spark中，所有不同的API，例如DStream，Dataframe都是基于RDD抽象的。但是在Flink中，Dataset和DataStream是同一个公用的引擎之上两个独立
+的抽象。所以你不能把这两者的行为合并在一起操作，当然，Flink社区目前在朝这个方向努力，但是目前还不能轻易断言最后的结果。
+2、内存管理　　
+一直到1.5版本，Spark都是试用java的内存管理来做数据缓存，明显很容易导致OOM或者gc。所以从1.5开始，Spark开始转向精确的控制
+内存的使用，这就是tungsten项目了。　　而Flink从第一天开始就坚持自己控制内存试用。这个也是启发了Spark走这条路的原因之一。Flink除了把数据
+存在自己管理的内存以外，还直接操作二进制数据。在Spark中，从1.5开始，所有的dataframe操作都是直接作用在tungsten的二进制数据上。
+3、语言实现　　
+Spark是用scala来实现的，它提供了Java，Python和R的编程接口。Flink是java实现的，当然同样提供了Scala API所以从语言的角度来看，Spark要更丰富一些。因为我已经转移到scala很久了，所以不太清楚这两者的java api实现情况。
+4、API　　
+Spark和Flink都在模仿scala的collection API.所以从表面看起来，两者都很类似。下面是分别用RDD和DataSet API实现的word count
+不知道是偶然还是故意的，API都长得很像，这样很方便开发者从一个引擎切换到另外一个引擎。我感觉以后这种Collection API会成为写data pipeline的标配。
+5、Steaming　　
+Spark把streaming看成是更快的批处理，而Flink把批处理看成streaming的special case。这里面的思路决定了各自的方向，其中两者的差异点有如下这些：实时 vs 近实时的角度：Flink提供了基于每个事件的流式处理机制，所以可以被认为是一个真正的流式计算。它非常像storm的model。而Spark，不是基于事件的粒度，而是用小批量来模拟流式，也就是多个事件的集合。所以Spark被认为是近实时的处理系统。　　Spark streaming 是更快的批处理，而Flink Batch是有限数据的流式计算。虽然大部分应用对准实时是可以接受的，但是也还是有很多应用需要event level的流式计算。这些应用更愿意选择storm而非Spark streaming，现在，Flink也许是一个更好的选择。流式计算和批处理计算的表示：Spark对于批处理和流式计算，都是用的相同的抽象：RDD，这样很方便这两种计算合并起来表示。而Flink这两者分为了DataSet和DataStream，相比Spark，这个设计算是一个糟糕的设计。对 windowing 的支持：因为Spark的小批量机制，Spark对于windowing的支持非常有限。只能基于process time，且只能对batches来做window。而Flink对window的支持非常到位，且Flink对windowing API的支持是相当给力的，允许基于process time,data time,record 来做windowing。我不太确定Spark是否能引入这些API，不过到目前为止，Flink的windowing支持是要比Spark好的。Steaming这部分Flink胜
+6、SQL interface　　
+目前Spark-sql是Spark里面最活跃的组件之一，Spark提供了类似Hive的sql和Dataframe这种DSL来查询结构化数据，API很成熟，在流式计算中使用很广，预计在流式计算中也会发展得很快。至于Flink，到目前为止，Flink Table API只支持类似DataFrame这种DSL，并且还是处于beta状态，社区有计划增加SQL 的interface，但是目前还不确定什么时候才能在框架中用上。所以这个部分，Spark胜出。
+7、外部数据源的整合　　
+Spark的数据源 API是整个框架中最好的，支持的数据源包括NoSql db,parquet,ORC等，并且支持一些高级的操作，例如predicate push down。Flink目前还依赖map/reduce InputFormat来做数据源聚合。这一场Spark胜
+8、Iterative processing　　
+Spark对机器学习的支持较好，因为可以在Spark中利用内存cache来加速机器学习算法。但是大部分机器学习算法其实是一个有环的数据流，但是在Spark中，实际是用无环图来表示的，一般的分布式处理引擎都是不鼓励试用有环图的。但是Flink这里又有点不一样，Flink支持在runtime中的有环数据流，这样表示机器学习算法更有效而且更有效率。这一点Flink胜出。
+9、Stream as platform vs Batch as Platform　　
+Spark诞生在Map/Reduce的时代，数据都是以文件的形式保存在磁盘中，这样非常方便做容错处理。Flink把纯流式数据计算引入大数据时代，无疑给业界带来了一股清新的空气。这个idea非常类似akka-streams这种。成熟度目前的确有一部分吃螃蟹的用户已经在生产环境中使用Flink了，不过从我的眼光来看，Flink还在发展中，还需要时间来成熟。结论　　目前Spark相比Flink是一个更为成熟的计算框架，但是Flink的很多思路很不错，Spark社区也意识到了这一点，并且逐渐在采用Flink中的好的设计思路，所以学习一下Flink能让你了解一下Streaming这方面的更迷人的思路。
+
+
+====================================
+Flink 比Spark好的地方：    
+Stream给力，市面上最好的stream framework没有之一    Stream 近似 Batch没有硬伤（相反mini batch近似Stream会搞乱batch里的顺序）。相当于自带lambda architectureFlink不足的地方：    用户群没有Spark多，stackoverflow上能找到的Solution少    Documentation还在完善中，尤其scala部分    java比scala啰嗦...
+========================================
+flink是一个类似spark的“开源技术栈”，因为它也提供了批处理，流式计算，图计算，交互式查询，机器学习等。flink也是内存计算，比较类似spark，但是不一样的是，spark的计算模型基于RDD，将流式计算看成是特殊的批处理，他的DStream其实还是RDD。而flink吧批处理当成是特殊的流式计算，但是批处理和流式计算的层的引擎是两个，抽象了DataSet和DataStream。flink在性能上也标新很好，流式计算延迟比spark少，能做到真正的流式计算，而spark只能是准流式计算。而且在批处理上，当迭代次数变多，flink的速度比spark还要快，所以如果flink早一点出来，或许比现在的Spark更火。
+=======================================
+Spark底层对待每个时间窗口就像对待文件，只不过这些文件允许放一部分或者全部在内存里，在内部实现是对不可变数据集的操作，所有操作都是基于scan优点是只要基于map reduce封装出来的算子在streaming上基本上都可以用缺点是Spark里RDD的生成和消费成本太高，没法做到毫秒级，秒级相对来说rdd自身开销也占了不小，但是如果是分钟级，小时级，rdd自身开销相对来说不大了，这个时候spark的吞吐量优势就出来了Flink底层和Storm差不多，流进来直接更新内部状态，在内部实现状态是允许随时更新的，操作就像个hashmap，你丢什么东西进去都可以，每来一条数据更新一次状态，然后根据你输出的策略定时去获取这些状态输出由于flink里创建状态和更新状态的成本都很小，所以毫秒级之类的不在话下，你自己写个也差不多的性能优点是对于秒级以下的处理吞吐量和实时性要比spark高缺点的话也挺多的        
+1.因为是基于状态的计算，所以在几个窗口内做做排序什么的很难实现，只能把所有状态丢到内存里你自己做实现，超出内存了估计就直接oom了，spark因为是基于rdd的可以利用rdd的优势，哪怕数据超出内存一样算，所以在较粗时间粒度极限吞吐量上spark streaming要优于flink        
+2.spark streaming提供的reduceByWindow函数支持一个inverse reduce函数，比如你计算最近1小时，按秒级别窗口滑动，spark通过实现inverse reduce函数每次只计算进来和要逐出的子窗口，flink没提供任何这种相关的api，你就必须要执行3600个窗口的聚合操作，当然这个通过自己封装聚合算子还是能实现的。
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+
+[2].选择合适大数据生态圈（根据业务需求选择）
+
+
+
+[3].spark与flink适用场景
+
+
+
+[4-1]spark环境搭建篇
+	---开发环境依赖
+	---IDEA Java8+ springBoot kafka_2.11-2.0.0
+	   spark-2.3.1-bin-hadoop2.7 zookeeper-3.4.10  
+
+yum install lrzsz vim wget net-tools -y  安装需要的命令
+
+/**  jdk */
+
+1.配置java环境变量
+vim /etc/profile
+export JAVA_HOME=/jdk/jdk1.8.0_181
+export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+export PATH=$JAVA_HOME/bin:$PATH
+. /etc/profile
+
+
+/** zookeeper */
+2.zookeeper 配置  
+
+[单机版]
+mkdir -p /zookeeper
+cd /zookeeper
+tar zxvf zookeeper-3.4.10.tar.gz -C /zookeeper
+cp zoo_sample.cfg 为 zoo.cfg 修改 zoo.cfg
+启动zookeeper即可  
+cd /zookeeper/zookeeper-3.4.10/bin
+./zkServer.sh start   ./zkServer.sh status
+[集群版]
+主要步骤
+A. 下载zookeeper  wget https://mirrors.tuna.tsinghua.edu.cn/apache/zookeeper/zookeeper-3.4.10/zookeeper-3.4.10.tar.gz
+B. tar zxvf  放zookeeper的目录/zookeeper-3.4.10.tar.gz 
+C. 配置 zoo.cfg  
+tickTime=2000
+initLimit=10
+syncLimit=5
+dataDir=/zookeeper/zookeeperData
+dataLogDir=/zookeeper/zookeeperDatalog
+clientPort=2181
+server.1=192.168.126.128:12888:13888
+server.2=192.168.126.130:12888:13888
+server.3=192.168.126.129:12888:13888
+echo "1" >  /zookeeper/zookeeperData/myid
+echo "2" >  /zookeeper/zookeeperData/myid
+echo "3" >  /zookeeper/zookeeperData/myid
+分别启动zookeeper服务   ./zkServer.sh start   ./zkServer.sh status
+
+/** kafka */
+3.kafka 配置
+
+主要步骤[单机/集群配置]
+1.下载kafka 
+2.上传到3台不同IP服务上面  并解压
+3.cd  /存放Kafka的目录/kafka/kafka_2.11-0.9.0.1/config/
+主要关注：server.properties 这个文件即可，我们可以发现在目录下：修改 server.properties
+
+-------------------------------------------------------------------------------
+	broker.id=0  #当前机器在集群中的唯一标识，和zookeeper的myid性质一样
+	port=19092 #当前kafka对外提供服务的端口默认是9092
+	host.name=192.168.126.132 #这个参数默认是关闭的，在0.8.1有个bug，DNS解析问题，失败率的问题。
+	num.network.threads=3 #这个是borker进行网络处理的线程数
+	num.io.threads=8 #这个是borker进行I/O处理的线程数
+	log.dirs=/kafka/kafkalogs/ #消息存放的目录，这个目录可以配置为“，”逗号分割的表达式，上面的num.io.threads要大于这个目录的个数这个目录，如果配置多个目录，新创建的topic他把消息持久化的地方是，当前以逗号分割的目录中，那个分区数最少就放那一个
+	socket.send.buffer.bytes=102400 #发送缓冲区buffer大小，数据不是一下子就发送的，先回存储到缓冲区了到达一定的大小后在发送，能提高性能
+	socket.receive.buffer.bytes=102400 #kafka接收缓冲区大小，当数据到达一定大小后在序列化到磁盘
+	socket.request.max.bytes=104857600 #这个参数是向kafka请求消息或者向kafka发送消息的请请求的最大数，这个值不能超过java的堆栈大小
+	num.partitions=1 #默认的分区数，一个topic默认1个分区数
+	log.retention.hours=168 #默认消息的最大持久化时间，168小时，7天
+	message.max.byte=5242880  #消息保存的最大值5M
+	default.replication.factor=2  #kafka保存消息的副本数，如果一个副本失效了，另一个还可以继续提供服务
+	replica.fetch.max.bytes=5242880  #取消息的最大直接数
+	log.segment.bytes=1073741824 #这个参数是：因为kafka的消息是以追加的形式落地到文件，当超过这个值的时候，kafka会新起一个文件
+	log.retention.check.interval.ms=300000 #每隔300000毫秒去检查上面配置的log失效时间（log.retention.hours=168 ），到目录查看是否有过期的消息如果有，删除
+	log.cleaner.enable=false #是否启用log压缩，一般不用启用，启用的话可以提高性能
+	zookeeper.connect=192.168.126.132:2181
+	#设置zookeeper的连接端口
+--------------------------------------------------------------------------------------
+
+
+上面是参数的解释，实际的修改项为：
+#broker.id=0  每台服务器的broker.id都不能相同
+#hostname
+host.name=192.168.7.100
+#在log.retention.hours=168 下面新增下面三项
+message.max.byte=5242880
+default.replication.factor=2
+replica.fetch.max.bytes=5242880
+#设置zookeeper的连接端口
+zookeeper.connect=192.168.126.128:2181,192.168.126.129:2181,192.168.126.130:2181
+
+
+192.168.126.128:2181,192.168.126.129:2181,192.168.126.130:2181
+
+4、启动Kafka集群并测试
+#从后台启动Kafka集群（3台都需要启动） 3台都需要启动
+cd /存放Kafka的目录/kafka/kafka_2.11-0.9.0.1//bin #进入到kafka的bin目录 
+./kafka-server-start.sh -daemon ../config/server.properties
+
+检查服务是否启动
+#执行命令jps
+20348 Jps
+4233 QuorumPeerMain
+18991 Kafka
+
+创建Topic来验证是否创建成功
+
+更多请看官方文档：http://kafka.apache.org/documentation.html
+
+复制代码
+#创建Topic
+./kafka-topics.sh --create --zookeeper 192.168.126.132:2181 --replication-factor 1 --partitions 1 --topic licslanxx
+#解释
+--replication-factor 2   #复制两份
+--partitions 1 #创建1个分区
+--topic #主题为licslan
+
+[在一台服务器上创建一个发布者]
+#创建一个broker，发布者  port=9092 #当前kafka对外提供服务的端口默认是9092
+./kafka-console-producer.sh --broker-list 192.168.126.132:9092 --topic licslan
+
+[在一台服务器上创建一个订阅者]
+kafka 创建消费者报错 consumer zookeeper is not a recognized option
+最后附上0.90版本之后启动消费者的方法
+./kafka-console-consumer.sh --bootstrap-server 192.168.126.132:9092 --topic licslan --from-beginning
+XXXXXX---->./kafka-console-consumer.sh --zookeeper 192.168.126.132:2181 --topic licslan --from-beginning
+、其他命令
+大部分命令可以去官方文档查看
+查看topic
+./kafka-topics.sh --list --zookeeper localhost:2181
+#就会显示我们创建的所有topic
+4.2、查看topic状态
+复制代码
+/kafka-topics.sh --describe --zookeeper localhost:2181 --topic licslan
+#下面是显示信息
+Topic:ssports    PartitionCount:1    ReplicationFactor:2    Configs:
+    Topic: licslan    Partition: 0    Leader: 1    Replicas: 0,1    Isr: 1
+#分区为为1  复制因子为2   他的  shuaige的分区为0 
+#Replicas: 0,1   复制的为0，1
+日志说明
+
+默认kafka的日志是保存在/opt/kafka/kafka_2.10-0.9.0.0/logs目录下的，这里说几个需要注意的日志
+
+server.log #kafka的运行日志
+state-change.log  #kafka他是用zookeeper来保存状态，所以他可能会进行切换，切换的日志就保存在这里
+
+controller.log #kafka选择一个节点作为“controller”,当发现有节点down掉的时候它负责在游泳分区的所有节点中选择
+新的leader,这使得Kafka可以批量的高效的管理所有分区节点的主从关系。如果controller down掉了，
+活着的节点中的一个会备切换为新的controller.
+5.2、上面的大家你完成之后可以登录zk来查看zk的目录情况
+
+#使用客户端进入zk
+./zkCli.sh -server 127.0.0.1:2181  #默认是不用加’-server‘参数的因为我们修改了他的端口
+
+#查看目录情况 执行“ls /”
+[zk: 127.0.0.1:2181(CONNECTED) 0] ls /
+
+#显示结果：[consumers, config, controller, isr_change_notification, admin, brokers, zookeeper, controller_epoch]
+'''
+上面的显示结果中：只有zookeeper是，zookeeper原生的，其他都是Kafka创建的
+'''
+
+#标注一个重要的
+[zk: 127.0.0.1:2181(CONNECTED) 1] get /brokers/ids/1
+{"jmx_port":-1,"timestamp":"1456125963355","endpoints":["PLAINTEXT://192.168.7.100:19092"],"host":"192.168.7.100","version":2,"port":9092}
+cZxid = 0x1000001c1
+ctime = Mon Feb 22 15:26:03 CST 2016
+mZxid = 0x1000001c1
+mtime = Mon Feb 22 15:26:03 CST 2016
+pZxid = 0x1000001c1
+cversion = 0
+dataVersion = 0
+aclVersion = 0
+ephemeralOwner = 0x152e40aead20016
+dataLength = 139
+numChildren = 0
+[zk: 127.0.0.1:12181(CONNECTED) 2] 
+
+#还有一个是查看partion
+[zk: 127.0.0.1:12181(CONNECTED) 7] get /brokers/topics/licslan/partitions/0
+null
+cZxid = 0x100000029
+ctime = Mon Feb 22 10:05:11 CST 2016
+mZxid = 0x100000029
+mtime = Mon Feb 22 10:05:11 CST 2016
+pZxid = 0x10000002a
+cversion = 1
+dataVersion = 0
+aclVersion = 0
+ephemeralOwner = 0x0
+dataLength = 0
+numChildren = 1
+[zk: 127.0.0.1:12181(CONNECTED) 8]
+
+
+4.spark 配置
+
+
+//总结
+
+/** 
+ * 
+ ssh root@192.168.126.132 
+
+ 启动zookeeper 
+ cd /zookeeper/zookeeper-3.10/bin 
+ ./zkServer.sh start 
+ ./zkServer.sh status
+
+
+ 启动kafka
+ cd /kafka/kafkadir/bin
+ ./kafka-server-start.sh -daemon ../config/server.properties
+ ./kafka-topics.sh --create --zookeeper licslan:2181 --replication-factor 1 --partitions 1 --topic licslan
+./kafka-console-consumer.sh --bootstrap-server licslan:9092 --topic licslan --from-beginning
+ ./kafka-console-producer.sh --broker-list licslan:9092 --topic licslan
+ ./kafka-topics.sh --delete --zookeeper licslan:2181  --topic licslan
+ ./kafka-topics.sh --list --zookeeper licslan:2181  
+
+启动spark
+
+启动master节点：./sbin/start-master.sh 
+webUI访问端口：8080 
+Master默认监听端口：7077
+
+启动woker节点：./sbin/start-slave.sh 
+例如：./start-slave.sh spark://licslan:7077 
+参数：表示master节点的访问地址（注意host-ip映射） 
+cd /spark/sparkdir/bin
+连接单机Spark集群：./spark-shell –master spark://licslan:7077 （Spark Scala交互式开发环境，“:quit”退出） 
+
+单机提交Spark自带测试作业：计算PI 
+./spark-submit --class org.apache.spark.examples.SparkPi --master spark://licslan:7077 /spark/spark-2.2.1-bin-hadoop2.6/examples/jars/spark-examples_2.11-2.2.1.jar 100
+
+
+./spark-submit --class com.swjuyhz.sample.SampleApplication --master spark://licslan:7077 /spark/spark-2.2.1-bin-hadoop2.6/examples/jars/spring-boot-spark-streaming-kafka-sample-0.0.1-SNAPSHOT.jar
+
+
+ */
+[4-2]flink环境搭建
+
+
+
+
+
+
+//spark demo
+https://github.com/vector4wang/quick-spark-process
+
+
+
+//flink demo
+
+
+总结：
+spark与flink实时计算流式数据处理
+如何选择？优势劣势对比 结合场景使用
+对于随机森林算法运用场景用Java/scala/python实现都行 
+
+//随机森林算法
+https://github.com/hexiaolang/RandomForest-In-text-classification
+
+
+
+
+-------------------------------------------------------------------------------------------
+-
+-
+-                         流程架构图
+-
+-
+-              ------------
+-              -          -
+-              -    DATA  -
+-              -          -
+-              ------------
+-                    |
+-
+-                    |
+-
+-                   \|/
+-
+-
+-                   Spark SparkStreaming  ----------  rf RandomForest [Machine-Learning-Algorithm]
+-																			
+-																			 |			
+-
+-																			 |
+-
+-																			\|/
+-
+-																		   RESULT ------------- Applied to real life and generate value
+-
+-   																				
+-
+-
+-
+------------------------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------------------------------------
+随机森林算法
+由多个决策树构成的森林，算法分类结果由这些决策树投票得到，决策树在生成的过程当中分别在行方向和列方向上添加
+随机过程，行方向上构建决策树时采用放回抽样（bootstraping）得到训练数据，列方向上采用无放回随机抽样得到特征子集，
+并据此得到其最优切分点，这便是随机森林算法的基本原理。图 3 给出了随机森林算法分类原理，从图中可以看到，随机森林
+是一个组合模型，内部仍然是基于决策树，同单一的决策树分类不同的是，随机森林通过多个决策树投票结果进行分类，算法不
+容易出现过度拟合问题
+
+
+随机森林算法案例实战
+本节将通过介绍一个案例来说明随机森林的具体应用。一般银行在货款之前都需要对客户的还款能力进行评估，但如果客户数据量比较庞大，
+信贷审核人员的压力会非常大，此时常常会希望通过计算机来进行辅助决策。随机森林算法可以在该场景下使用，例如可以将原有的历史数
+据输入到随机森林算法当中进行数据训练，利用训练后得到的模型对新的客户数据进行分类，这样便可以过滤掉大量的无还款能力的客户，
+如此便能极大地减少信货审核人员的工作量。
+
+假设存在下列信贷用户历史还款记录：
+
+表 2. 信贷用户历史还款数据表
+记录号	是否拥有房产（是/否）	婚姻情况（单身、已婚、离婚）	年收入（单位：万元）	是否具备还款能力（是、否）
+10001	否	已婚	10	是
+10002	否	单身	8	是
+10003	是	单身	13	是
+……	….	…..	….	……
+11000	是	单身	8	否
+上述信贷用户历史还款记录被格式化为 label index1:feature1 index2:feature2 index3:feature3 这种格式，例如上表中的第一条记录将被格式化为 0 1:0 2:1 3:10，各字段含义如下：
+是否具备还款能力 是否拥有房产 婚姻情况，0 表示单身、 年收入
+0 表示是，1 表示否 0 表示否，1 表示是 1 表示已婚、2 表示离婚 填入实际数字
+0 1:0 2:1 3:10
+
+将表中所有数据转换后，保存为 sample_data.txt，该数据用于训练随机森林。测试数据为：
+表 3. 测试数据表
+是否拥有房产（是/否）	婚姻情况（单身、已婚、离婚）	年收入（单位：万元）
+否	已婚	12
+
+如果随机森林模型训练正确的话，上面这条用户数据得到的结果应该是具备还款能力，为方便后期处理，我们将其保存为 input.txt，内容为：
+0 1:0 2:1 3:12
+将 sample_data.txt、input.txt 利用 hadoop fs –put input.txt sample_data.txt /data 上传到 HDFS 中的/data 目录当中，再编写如清单 9 所示的代码进行验证
+清单 9. 判断客户是否具有还贷能力
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+SparkMlib是Spark项目的其中一个模块，包含了当前比较热门的机器学习算法，这些算法API主要分成两种。ML和MLIB。
+本文对官方文档中描述的一些算法和工具进行了简单的介绍。
+ML主要针对DataFrame,MLIB则面向RDD，算法的种类基本一致，我个人比较偏向于ML，结构化的数据更易操作一些。
+
+Classification
+      分类算法包括逻辑回归，决策树以及随机森林等等。适合解决有监督形式的机器学习。
+      现实生活中常常用来预测，用户是否会流失、是否是垃圾邮件、明天是否会下雨等等。
+      同时部分模型也支持多种分类的预测，如保险业保单风险评级（A,B,C,D,E等级）
+
+Regression
+       回归算法包括线性回归等等，用来进行连续值的预测，譬如明天气温多少度，PM2.5有多少，网站PV等等。
+
+clustering
+       聚类算法主要是Kmeans,适用于无监督学习，适用的场景包括用户随机分群。分群后的数据更便于我们总结用户特征。
+        LDA主要应用于文本类数据的分析，可以总结出各个文章群的主要主题，也就是各个分群的关注点。
+        GMM和Kmeans比较类似，但是Kmeans中一个数据只属于一个簇，GMM会将一个数据分配到多个簇，并给出每个簇的概率。
+
+collaborative filtering
+        协同过滤是一种推荐算法，根据用户对物品的偏好构建稀缺矩阵，并计算其对其他物品的喜好程度。应用的场景诸如：
+        电商网站的猜你喜欢，音乐推荐，电影推荐等等。
+
+Evaluation Metrics
+        这篇文章介绍的类都是一些用来检验模型效果的工具类，譬如用户是否流失的模型预测中，这个工具类可以帮助我
+		们根据数据的实际值和预测值进行准确率的计算。还包括F1，ROC等等一系列模型指标。诸如各类回归模型的方差，推荐系统的TOP-N等等。
+
+model selection
+        这篇文章介绍的是一种模型选择的方法，同一份代码，可以为同一种模型设置不同的参数，根据定义的模型检验类，Spark会
+		帮助你计算最优的参数设置，并输出最优的模型。
+
+Extracting,transforming and selecting features
+        这篇文章主要介绍了如果将数据转为向量，如何将向量转为数据，以及如何合并，优化向量。诸如将两个字段合并为一个向量，
+		将文本转为向量，将性别转为向量等等。
+
+Pipeline
+         Pipeline可以理解为一种LIST，他可以将模型和transforming串联起来，并输出一个完成的模型。
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+一个数据源系统（xxsys）流入kafka后，spark/flink 从kafka 中取出数据
+进行处理，整理清洗和可视化等等操作，后面再使用基于机器学习的RFA[Random forest algorithm] 
+ 随机森林算法处理数据结合业务场景对这些数据予用运用到实际生产环境并产生价值
+/javaPorject/spring-boot-spark-streaming-kafka-sample-master/src/main/java/com/swjuyhz/sample/sparkstream/executor
+(https://images.gitee.com/uploads/images/2018/0928/181505_c16eb8ce_557687.jpeg "spark-steaming-erro1.jpg")
+(https://images.gitee.com/uploads/images/2018/0928/181147_33e92336_557687.jpeg "spark-steaming-erro.jpg")
+(https://images.gitee.com/uploads/images/2018/0928/180758_a77288ce_557687.jpeg "spark-running.jpg")
+(https://images.gitee.com/uploads/images/2018/0928/180653_6558ce47_557687.jpeg "kafka.jpg")
+
+
+感谢以下组织与作者
+http://spark.apache.org/  
+http://flink-china.org/   
+https://flink.apache.org/
+https://blog.csdn.net/justlpf/article/details/80292474
+https://gitee.com/river_rock/spring-boot-spark-streaming-kafka-sample/issues/IN849
+https://github.com/hexiaolang/RandomForest-In-text-classification
+to be contiue ..... 待更新
+
+
+
+spring.application.name=spring-boot-spark-streaming-kafka-sample
+# LOGGING
+server.port=9999
+logging.level.root=info
+
+logging.path=/applog/${spring.application.name}
+#spark config start
+spark.driver.memory=32g
+spark.worker.memory=25g
+spark.executor.memory=25g
+spark.rpc.message.maxSize=1024
+#spark master
+spark.master = spark://192.168.126.132:7077
+#spark topics ','号分割
+spark.kafka.topics = licslan
+#kafka集群地址，'，'号分割
+kafka.broker.list = 192.168.126.132:9092
+#从kafka拉数据的间隔时间，单位 S
+spark.stream.kafka.durations=10
+#spark config end
+
+#=================kafka setting===========================
+kafka.consumer.zookeeper.connect=192.168.126.132:2181
+kafka.consumer.servers=192.168.126.132:9092
+kafka.consumer.enable.auto.commit=true
+kafka.consumer.session.timeout=6000
+kafka.consumer.auto.commit.interval=100
+kafka.consumer.auto.offset.reset=latest
+kafka.consumer.topic=licslan
+kafka.consumer.group.id=test
+kafka.consumer.concurrency=10
+
+kafka.producer.servers=192.168.126.132:9092
+kafka.producer.retries=0
+kafka.producer.batch.size=4096
+kafka.producer.linger=1
+kafka.producer.buffer.memory=40960
+
+
+99
+编写Jstom实时计算规则功能 & 编写反欺诈消息推送功能接口并测试
+
+916
+jstorm 实时计算代码优化和调整 jstorm/storm API 了解和使用 jstorm 实时计算代码模拟数据测试
+
+923
+熟悉数据网关统计指标代码 开发数据网关统计指标数据迁移到hbase代码改造 数据网关统计指标数据迁移到hbase代码改造开发完成并测试

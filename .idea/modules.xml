@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/spark-pi/spark-pi.iml" filepath="$PROJECT_DIR$/spark-pi/spark-pi.iml" />
+      <module fileurl="file://$PROJECT_DIR$/spark-sb-word-count/spark-sb-word-count.iml" filepath="$PROJECT_DIR$/spark-sb-word-count/spark-sb-word-count.iml" />
+      <module fileurl="file://$PROJECT_DIR$/spark-sql/spark-sql.iml" filepath="$PROJECT_DIR$/spark-sql/spark-sql.iml" />
+      <module fileurl="file://$PROJECT_DIR$/spark-word-count/spark-word-count.iml" filepath="$PROJECT_DIR$/spark-word-count/spark-word-count.iml" />
+      <module fileurl="file://$PROJECT_DIR$/sparkd-emo-all/sparkd-emo-all.iml" filepath="$PROJECT_DIR$/sparkd-emo-all/sparkd-emo-all.iml" />
+      <module fileurl="file://$PROJECT_DIR$/sparkdemos.iml" filepath="$PROJECT_DIR$/sparkdemos.iml" />
+    </modules>
+  </component>
+</project>
