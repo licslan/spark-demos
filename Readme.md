@@ -63,7 +63,8 @@ You can run Spark using its standalone cluster mode, on EC2, on Hadoop YARN, on 
 1、Spark在SQL上的优化，尤其是DataFrame到DataSet其实是借鉴的Flink的。Flink最初一开始对SQL支持得就更好。
 2、Spark的cache in memory在Flink中是由框架自己判断的，而不是用户来指定的，因为Flink对数据的处理不像Spark以RDD为单位，就是一种细粒度的处理，对内存的规划更好。
 3、Flink原来用Java写确实很难看，现在也在向Spark靠拢，Scala的支持也越来越好。不管怎么说，二者目前都是在相互吸收。
-=============================
+
+
 1、抽象 Abstraction　　
 Spark中，对于批处理我们有RDD,对于流式，我们有DStream，不过内部实际还是RDD.所以所有的数据表示本质上还是RDD抽象。
 后面我会重点从不同的角度对比这两者。在Flink中，对于批处理有DataSet，对于流式我们有DataStreams。看起来和Spark类似，他们的不同点在于：　　
@@ -95,12 +96,13 @@ Spark对机器学习的支持较好，因为可以在Spark中利用内存cache�
 Spark诞生在Map/Reduce的时代，数据都是以文件的形式保存在磁盘中，这样非常方便做容错处理。Flink把纯流式数据计算引入大数据时代，无疑给业界带来了一股清新的空气。这个idea非常类似akka-streams这种。成熟度目前的确有一部分吃螃蟹的用户已经在生产环境中使用Flink了，不过从我的眼光来看，Flink还在发展中，还需要时间来成熟。结论　　目前Spark相比Flink是一个更为成熟的计算框架，但是Flink的很多思路很不错，Spark社区也意识到了这一点，并且逐渐在采用Flink中的好的设计思路，所以学习一下Flink能让你了解一下Streaming这方面的更迷人的思路。
 
 
-====================================
 Flink 比Spark好的地方：    
 Stream给力，市面上最好的stream framework没有之一    Stream 近似 Batch没有硬伤（相反mini batch近似Stream会搞乱batch里的顺序）。相当于自带lambda architectureFlink不足的地方：    用户群没有Spark多，stackoverflow上能找到的Solution少    Documentation还在完善中，尤其scala部分    java比scala啰嗦...
-========================================
+
+
 flink是一个类似spark的“开源技术栈”，因为它也提供了批处理，流式计算，图计算，交互式查询，机器学习等。flink也是内存计算，比较类似spark，但是不一样的是，spark的计算模型基于RDD，将流式计算看成是特殊的批处理，他的DStream其实还是RDD。而flink吧批处理当成是特殊的流式计算，但是批处理和流式计算的层的引擎是两个，抽象了DataSet和DataStream。flink在性能上也标新很好，流式计算延迟比spark少，能做到真正的流式计算，而spark只能是准流式计算。而且在批处理上，当迭代次数变多，flink的速度比spark还要快，所以如果flink早一点出来，或许比现在的Spark更火。
-=======================================
+
+
 Spark底层对待每个时间窗口就像对待文件，只不过这些文件允许放一部分或者全部在内存里，在内部实现是对不可变数据集的操作，所有操作都是基于scan优点是只要基于map reduce封装出来的算子在streaming上基本上都可以用缺点是Spark里RDD的生成和消费成本太高，没法做到毫秒级，秒级相对来说rdd自身开销也占了不小，但是如果是分钟级，小时级，rdd自身开销相对来说不大了，这个时候spark的吞吐量优势就出来了Flink底层和Storm差不多，流进来直接更新内部状态，在内部实现状态是允许随时更新的，操作就像个hashmap，你丢什么东西进去都可以，每来一条数据更新一次状态，然后根据你输出的策略定时去获取这些状态输出由于flink里创建状态和更新状态的成本都很小，所以毫秒级之类的不在话下，你自己写个也差不多的性能优点是对于秒级以下的处理吞吐量和实时性要比spark高缺点的话也挺多的        
 1.因为是基于状态的计算，所以在几个窗口内做做排序什么的很难实现，只能把所有状态丢到内存里你自己做实现，超出内存了估计就直接oom了，spark因为是基于rdd的可以利用rdd的优势，哪怕数据超出内存一样算，所以在较粗时间粒度极限吞吐量上spark streaming要优于flink        
 2.spark streaming提供的reduceByWindow函数支持一个inverse reduce函数，比如你计算最近1小时，按秒级别窗口滑动，spark通过实现inverse reduce函数每次只计算进来和要逐出的子窗口，flink没提供任何这种相关的api，你就必须要执行3600个窗口的聚合操作，当然这个通过自己封装聚合算子还是能实现的。
@@ -522,50 +524,3 @@ to be contiue ..... 待更新
 
 
 
-spring.application.name=spring-boot-spark-streaming-kafka-sample
-# LOGGING
-server.port=9999
-logging.level.root=info
-
-logging.path=/applog/${spring.application.name}
-#spark config start
-spark.driver.memory=32g
-spark.worker.memory=25g
-spark.executor.memory=25g
-spark.rpc.message.maxSize=1024
-#spark master
-spark.master = spark://192.168.126.132:7077
-#spark topics ','号分割
-spark.kafka.topics = licslan
-#kafka集群地址，'，'号分割
-kafka.broker.list = 192.168.126.132:9092
-#从kafka拉数据的间隔时间，单位 S
-spark.stream.kafka.durations=10
-#spark config end
-
-#=================kafka setting===========================
-kafka.consumer.zookeeper.connect=192.168.126.132:2181
-kafka.consumer.servers=192.168.126.132:9092
-kafka.consumer.enable.auto.commit=true
-kafka.consumer.session.timeout=6000
-kafka.consumer.auto.commit.interval=100
-kafka.consumer.auto.offset.reset=latest
-kafka.consumer.topic=licslan
-kafka.consumer.group.id=test
-kafka.consumer.concurrency=10
-
-kafka.producer.servers=192.168.126.132:9092
-kafka.producer.retries=0
-kafka.producer.batch.size=4096
-kafka.producer.linger=1
-kafka.producer.buffer.memory=40960
-
-
-99
-编写Jstom实时计算规则功能 & 编写反欺诈消息推送功能接口并测试
-
-916
-jstorm 实时计算代码优化和调整 jstorm/storm API 了解和使用 jstorm 实时计算代码模拟数据测试
-
-923
-熟悉数据网关统计指标代码 开发数据网关统计指标数据迁移到hbase代码改造 数据网关统计指标数据迁移到hbase代码改造开发完成并测试
