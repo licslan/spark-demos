@@ -2,10 +2,10 @@
 <project version="4">
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/spark-demo-all" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/spark-pi" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/spark-sb-word-count" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/spark-sql" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/spark-word-count" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/sparkd-emo-all" charset="UTF-8" />
   </component>
 </project>

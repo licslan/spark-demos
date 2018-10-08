@@ -13,7 +13,7 @@
         <module>spark-pi</module>
         <module>spark-sql</module>
         <module>spark-word-count</module>
-        <module>sparkd-emo-all</module>
+        <module>spark-demo-all</module>
     </modules>
     <packaging>pom</packaging>
 

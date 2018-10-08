@@ -6,6 +6,7 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="spark-demo-all" />
         <module name="spark-pi" />
         <module name="spark-sb-word-count" />
         <module name="spark-sql" />
@@ -14,6 +15,7 @@
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
+      <module name="spark-demo-all" target="1.8" />
       <module name="spark-pi" target="1.8" />
       <module name="spark-sb-word-count" target="1.8" />
       <module name="spark-sql" target="1.8" />
